@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>AgentOS</title>
+<style>
+  body { font: 13px system-ui, sans-serif; width: 300px; margin: 12px; color: #111; }
+  input { width: 100%; box-sizing: border-box; padding: 6px; margin: 4px 0 8px; border: 1px solid #ccc; border-radius: 6px; }
+  button { padding: 6px 12px; border: 0; border-radius: 6px; background: #111; color: #fff; cursor: pointer; }
+  .s { margin: 8px 0; font-weight: 600; } .muted { color: #666; font-size: 12px; }
+</style></head>
+<body>
+  <div><b>AgentOS</b> — let your agents use your tabs</div>
+  <div class="s" id="status">…</div>
+  <label class="muted">Pairing token (AgentOS → Browser page → Chrome extension)</label>
+  <input id="token" type="password" placeholder="paste token">
+  <label class="muted">This Chrome profile's name in AgentOS (e.g. asdf; empty = your Google account name)</label>
+  <input id="profile" placeholder="asdf">
+  <label class="muted">Gateway WebSocket</label>
+  <input id="url" placeholder="ws://127.0.0.1:7860/ws/extension">
+  <button id="save">Save & connect</button>
+  <p class="muted">Agents can read and screenshot your tabs. Clicking/typing on sites that aren't in your allowlist
+  asks for approval in AgentOS first. A red banner shows on any tab being controlled.</p>
+  <script src="popup.js"></script>
+</body>
+</html>

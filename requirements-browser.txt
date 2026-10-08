@@ -1,0 +1,5 @@
+# Browser service. The Playwright version MUST match the base image tag in docker/browser.Dockerfile.
+fastapi>=0.115
+uvicorn>=0.30
+pydantic>=2.8
+playwright==1.52.0

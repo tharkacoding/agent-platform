@@ -1,0 +1,228 @@
+AgentOS — mistakes found from the owner's phone session (2026-10-06, ~19:00)
+Each one is fixed with a GENERAL fix (no task-specific code), then re-tested. Status is updated here as I go.
+
+M1  "Where are you opening YouTube?" was treated as an ORDER and changed the task's course.
+    Cause:  every message sent while a task runs became a mid-run "steer", even a question.
+    Fix:    questions to a running task get an ANSWER (what it is doing right now, which browser/profile, which
+            step) and the plan is NOT changed. "stop"/"cancel" stops it. Only real instructions change course.
+    Status: FIXED IN CODE + unit-tested (live re-test pending)
+
+M2  It switched to Chrome profile "asdf" without being asked.
+    Cause:  the asdf profile, saved during the LeetCode runs, was applied to EVERY browser task (global preference).
+    Fix:    a saved profile only applies to the site/task it was saved for (e.g. leetcode). Otherwise use what the
+            owner named in THIS message; if nothing was named, never pick one of the owner's real profiles silently.
+    Status: FIXED IN CODE + unit-tested (live re-test pending)
+
+M3  "Open YouTube and play a song" never played anything — the browser agent clicked the search box 8 times and
+    never typed.
+    Cause:  clicking an input doesn't change the page, so it kept "trying again" on other refs; it never used type.
+    Fix:    (a) "search X on <site>" goes straight to the site's search-results URL; (b) to search, use
+            type{ref,text,submit} directly (no click first); (c) a click with no effect on an input is followed by
+            typing, never by more clicks; (d) "play" is verified by the URL being a video page (/watch) and the
+            player playing.
+    Status: FIXED IN CODE + unit-tested (live re-test pending)
+
+M4  Second try failed instantly: "'default' is your real Chrome profile" — but the first try used the same
+    "default" fine.
+    Cause:  name clash — AgentOS's own browser profile is called "default" and Chrome's own first profile is
+            "Default". The safety check confused them.
+    Fix:    AgentOS's own profile is never treated as a real Chrome profile; only names the owner actually has in
+            Chrome (asdf, Challa, ...) or "my default/main Chrome" count as real.
+    Status: FIXED IN CODE + unit-tested (live re-test pending)
+
+M5  All 4 steps failed and the review still said "satisfied".
+    Cause:  the reviewer model said satisfied; nothing double-checked it.
+    Fix:    the review can't be satisfied while steps failed and a different strategy is still possible; it must
+            add follow-ups (until the retry limit), and the final answer must say clearly it failed.
+    Status: FIXED IN CODE + unit-tested (live re-test pending)
+
+M6  The Computer Agent "located" the address bar of the WRONG window (the owner's Brave with AgentOS) and
+    acted there.
+    Cause:  locate/screenshot looks at the whole screen; the target Chrome window wasn't in front.
+    Fix:    before locate/click/paste the target window is brought to the front and checked; the vision model is
+            told which window to look at, and results outside that window are rejected.
+    Status: FIXED IN CODE + unit-tested (live re-test pending)
+
+M7  It took over the owner's mouse/keyboard while they were using the laptop (owner wants both working at once).
+    Cause:  the Computer Agent drives the real mouse/keyboard; the only protection was waiting for idle.
+    Fix:    researched solution (see below, M7 notes): drive the owner's real Chrome WITHOUT the mouse/keyboard —
+            through the AgentOS Chrome extension (chrome.debugger / CDP inside the owner's own Chrome profile, in a
+            background tab or separate window), so agent and owner work at the same time.
+    Status: OPEN (research in progress)
+
+M8  It typed the URL letter by letter ("https://www.youtube.com\n") instead of pasting it.
+    Cause:  this run was started before the new open_url action was loaded.
+    Fix:    open_url (Ctrl+L, paste, Enter, check the address bar) — already written; needs a restart + test.
+    Status: FIXED IN CODE, NOT YET RE-TESTED
+
+M9  (owner request) AgentOS should send SCREENSHOTS and its current status to the owner's phone when useful.
+    Fix:    ntfy image attachments: (a) a `phone_update(text, screenshot)` tool any agent can use when it wants to
+            show progress; (b) asking a running task "status?"/"what are you doing" from the phone answers with the
+            latest screenshot attached; (c) sending "screenshot" from the phone returns a screenshot of the screen
+            now; (d) finished/failed pushes attach the task's last screenshot.
+    Status: FIXED IN CODE + unit-tested (live re-test pending)
+
+M10 (owner request) Everything must come back by itself after the laptop restarts: AgentOS (gateway + phone
+    listener, runner, browser service, bridge) and OmniRoute.
+    Fix:    a Windows logon task (Task Scheduler, runs as the owner at log-on, hidden) that starts OmniRoute and
+            scripts/dev_up.ps1; checked with a health probe.
+    Status: DONE — scheduled task "AgentOS Autostart" (at log-on) runs scripts/autostart.ps1: starts OmniRoute if :20128 is down, then dev_up.ps1 if :7860 is down; log in data/logs/autostart.log. Tested by running the task.
+
+M11 (owner request, LAST item — only after everything else is done) The project folder is ~90 GB: find what's
+    using the space and clear everything not needed. List first, delete only with the owner's OK.
+    Status: OPEN (do last)
+
+M12 It asked the owner technical questions ("do you have a browser window open?", "default profile or a temporary
+    one?", "browser control or computer control?").
+    Fix:    question cards may ask only WHAT the owner wants; HOW (tools, browser, profile, windows) is decided by
+            the AI. Planner rule: web tasks use AgentOS's own visible browser (works alongside the owner);
+            computer use only when the owner's login/desktop app is needed.
+    Status: FIXED IN CODE (live re-test pending)
+
+M13 YouTube opened in the owner's own main Chrome profile ("Ramanji") without being asked.
+    Cause:  "default" (AgentOS's own profile) was mapped to Chrome's "Default" folder = the owner's main profile.
+    Fix:    same as M2 + M4: a real profile only if named in this request; "default" never means the owner's.
+    Status: FIXED IN CODE + unit-tested (live re-test pending)
+
+----- 2026-10-07 (found by the new capability suite + tool self-check, all in the Linux test VM) -----
+
+M14 A vague task ("plan a weekend trip") cost 284k tokens / 10 min although all 4 planned steps had succeeded.
+    Cause:  the review added 6 "polish" follow-up steps (research, planning, writing again) with no budget check.
+    Fix:    budget-aware review: when every step succeeded, at most 2 follow-ups and only what fits the request's
+            remaining budget (failed steps and missing batch items are never cut). Re-run: 137k tokens, pass.
+    Status: FIXED IN CODE + unit-tested + live re-test passed (16.2)
+    Second run: 362k — the PLANNER itself made 8 steps (6 parallel research agents; 861k estimate) and the default
+    "use more tokens" answer raised the budget to match. Fix 2: step cap per seriousness tier (2/2/4/6/8, non-batch);
+    over the cap, sibling steps on the same agent are MERGED (nothing dropped). Unit-tested; live re-test pending.
+
+M15 Research answers were slow (one claim-extraction LLM call per source, one after another: ~270 s).
+    Fix:    the per-source calls run in parallel (4 at a time) with the run's routing context copied into each thread.
+    Status: FIXED IN CODE + tests
+
+M16 The agent re-checked a verdict it had already seen (wait_for 'Accepted' several times) — and browser
+    wait_for didn't exist at all in the browser service (only on the desktop).
+    Fix:    browser_svc wait_for{texts,timeout_s} (one server-side poll); a verified, non-failure verdict ends the
+            UI loop at once (act → verify → finalize, no second look).
+    Status: FIXED IN CODE + unit-tested
+
+M17 Same agent planned as a chain of tiny steps ("open YouTube" → "search" → "play").
+    Fix:    same-agent chains (B depends only on A, nothing else needs A) are merged into ONE step.
+    Status: FIXED IN CODE + unit-tested
+
+M18 Agents wrote throwaway Python to find where Chrome profile "asdf" lives (owner's report) — no tool for it.
+    Fix:    chrome_profiles / chrome_profile_path tools (+ now, calc, fs_find, http_request, download_file,
+            page_text, find_command crawler + known_commands cookbook); the small read-only ones are allowed for
+            EVERY agent (incl. future Builder agents). Tool self-check (Tools page / API / nightly 16.37).
+    Status: FIXED IN CODE + unit-tested + live self-check 32 ok / 0 broken
+
+M19 In the VM every file/code tool was refused ("path outside allowed roots").
+    Cause:  RUNNER_ROOTS 'a;b;c' was split on os.pathsep (':' on Linux) → one bogus root.
+    Fix:    runner splits on ';' always (and ':' on Linux).          Status: FIXED + live-checked
+
+M20 data_profile / data_query never found files in host mode (Windows dev stack AND the VM).
+    Cause:  '/workspace/x.csv' is a container path; pandas inside the sandboxed Python got it unmapped.
+    Fix:    runner /python maps + jails `path_keys` inputs before the code runs; data tools use it.
+            Also: run_python now returns a top-level `output`/`result` variable when no run() is defined.
+    Status: FIXED + live-checked
+
+M21 search_code always failed (sent glob=None, runner wants a string → HTTP 422).   Status: FIXED + live-checked
+
+M22 "Stop" didn't stop: a cancelled run kept planning for minutes (16.6) — cancel was only checked at tool calls.
+    Fix:    every graph node (ctx.node) and every model call (llm.complete/stream/json) checks it first.
+    Status: FIXED IN CODE + unit-tested (live re-test pending)
+
+M23 "/deep-dive" ran at seriousness CRITICAL (money/security tier): biggest model + 2 rewrite rounds, 15+ min.
+    Fix:    deep-dive mode = "deep" tier; research critique splits MAJOR / minor — only major problems pay for a
+            full rewrite (critics always list nits). Status: FIXED IN CODE (live re-test pending)
+
+M24 Owner's Google sign-in in the VM was REJECTED ("this browser may not be secure"): the login window was a
+    Playwright-controlled Chrome, and Google refuses sign-in under automation.
+    Fix:    login windows are a PLAIN Chrome on the same profile (browser_svc /manual, no automation, same password
+            store so agents can read the cookies later); "Done" closes it. Status: FIXED (window open for the owner)
+
+M25 16.10 (coffee website) built the site but ran out of time: the browser agent couldn't open the file it had
+    written and guessed http://localhost:8012/index.html, /docs, /openapi.json… (10 wasted steps).
+    Fix:    browser_act goto/tab_new accept '/workspace/…' (or file:///workspace/…) → runner /fs/realpath → real
+            file:// URL (same jail as the file tools).  Status: FIXED IN CODE + unit-tested (live re-test pending)
+
+M26 16.11 "fix the failing tests": the fix was right in 1 minute, then 200k tokens were spent "debugging" because
+    pytest wasn't installed in the VM (every verify failed on the ENVIRONMENT, agents blamed the code).
+    Fix:    coding verify repairs environment problems once (python → python3, missing dev tool → pip install) before
+            any diagnosis; the VM is provisioned with python + pytest (vm_start.sh).   Status: FIXED + unit-tested
+
+M27 When every model behind OmniRoute was rate-limited (429s), requests like "buy the cheapest laptop" got a canned
+    "Hi! I'm AgentOS…" answer marked SUCCESS.
+    Fix:    per-run model-outage tracking; classification during an outage stops with a clear "my AI models are not
+            answering, nothing was done" and status failed.   Status: FIXED + unit-tested
+
+M28 "always use my asdf profile for leetcode" made asdf the GLOBAL default → every later browser task (YouTube,
+    example.com…) ran in the owner's logged-in profile (same family as M2/M13).
+    Fix:    site-scoped standing preferences (settings.site_profiles {site: profile}); the global default changes only
+            when no site is named. A profile locked by another Chrome window → clear 409, not a 500.
+    Status: FIXED + unit-tested
+
+M29 A successful tool build was marked FAILED: the "agent says it was blocked" check matched "handles missing
+    inputs gracefully" in the Main Agent's summary.   Fix: check tightened + never applied to the Main Agent's answer.
+
+M30 "open 5 tabs" counted a chrome-error:// tab and about:blank as opened tabs.
+    Fix:    only loaded http(s)/file tabs count; otherwise one retry that replaces the failed tabs.  Status: FIXED
+
+M31 "I need an agent that tracks my study hours…" never built an agent (planner used existing agents for a one-off).
+    Fix:    explicit build requests with no close existing match always go through the Agent Builder first.
+    Status: FIXED (live re-test running)
+
+M32 "/deep-dive /fact-check" still took 15+ min / 325k tokens: research_agent fanned out to 4 web_research agents,
+    each at the full "deep" tier (5 queries, 2 rewrites), then 2 summarization passes.
+    Fix:    a team lead's members work one tier below the lead (never below "light") — the lead aggregates/reviews.
+    Status: FIXED IN CODE (live re-test pending).   M22 (Stop anywhere) live re-test: PASSED (cancelled in 10 s).
+
+----- 2026-10-07 afternoon: T1 (LeetCode in the VM profile) — owner watched it loop for 30+ steps -----
+
+M33 Page reader listed CLOSED menus/drawers (still in the DOM) → the agent spent ~20 steps "closing overlays".
+    Fix: snapshot skips elements that aren't really visible (checkVisibility incl. ancestors/opacity, aria-hidden,
+         inert, off-screen).                                                                    Status: FIXED
+M34 Run / Submit / Debug were 3 unnamed icon buttons → it pressed Debug (page stuck in "Debugging…").
+    Fix: names fall back to the site's own test ids (data-e2e-locator, data-testid, …) + code-judge rule in the
+         prompt: set_code → Submit (never Run/Debug) → wait_for the verdict ONCE.                Status: FIXED
+M35 Two parallel browser steps drove the SAME tab (sessions were per run).
+    Fix: one session (= own tab) per plan step; a finished step RELEASES its tab (kept open) for the next step;
+         all closed at run end.                                                                 Status: FIXED + tests
+M36 SPA pages were read before they rendered → "blank page" → the agent wandered.
+    Fix: snapshot waits (≤6 s) for content when a page is still empty.                           Status: FIXED
+M37 The solver's report never named the problem ("single-pass stack matching — 20") → the submit step went to the
+    wrong problem.  Fix: report starts with "Problem: <title> (#n) — <url>".                     Status: FIXED
+M38 The URL guesser turned words into sites ("open in…" → www.in.com, www.problem.com, www.at.com), and it fired
+    whenever OUR validator rejected the model's (valid) action — 19 times in one run.
+    Fix: rejected actions are re-asked once with the reason; the fallback only uses URLs the goal really contains;
+         long goals never guess sites; a tool-VERIFIED result (set_code read-back) is never "no effect".
+    Status: FIXED + tests
+M39 Submit step planned for desktop_agent in the VM (no desktop there) because the step text didn't repeat the
+    profile name.  Fix: profile taken from the whole request; on machines without desktop control web steps always
+    go to browser_agent (plan AND review follow-ups).                                            Status: FIXED + tests
+N5  SUPERVISOR built: aap/core/supervisor.py — browser/desktop, coding and terminal loops report every 5 steps;
+    deterministic loop/ping-pong/stray-site/no-progress/token checks, cheap model decides continue/redirect/stop;
+    shown in the run timeline.                                                                   Status: DONE + tests
+M40 Review follow-ups ran in PARALLEL although they were a sequence (f1 rewrite code → f2 paste → f3 submit):
+    links between follow-ups were dropped (only links to old steps were kept).
+    Fix: _order_followups keeps declared + text-referenced links ("from step f1"); browser/desktop follow-ups run
+         one after another in listed order.                                                     Status: FIXED + test
+M41 The paste step pasted OLD code from recalled memory (largest code block in its goal), not the solver's code.
+    Fix: solution_code() takes the newest upstream solver report's code; set_code always uses that exact code.
+                                                                                                Status: FIXED + test
+M42 The solver always wrote stdin programs; LeetCode needs `class Solution` → guaranteed Wrong Answer.
+    Fix: stress test stays on the stdin program; for LeetCode it is then converted to the official class Solution
+         method (checked: class Solution, no stdin) and that is the code handed on. The browser refuses to paste
+         stdin code into LeetCode ("Not submitted: … must be rewritten").                       Status: FIXED
+M43 First real T1 submissions: 4× "Compile Error" — correct Python code, but the account's editor language was C++.
+    Fix: set_code{text, language}: the browser service switches the editor's language picker first (and refuses to
+         paste when it can't), the agent derives the language from the code (Python3/C++/Java/JavaScript).
+    Status: FIXED + test (live re-test running)
+N5  live: the supervisor caught a ping-pong (step 5) and repeated waits (step 10) and redirected the agent, which
+    then went to the right profile page.
+M44 Paste and Submit ran as separate steps; the Submit step found the editor reloaded with the site's stored stub.
+    Fix: deterministic code-judge sequence in ONE step: set_code(+language, verified) → click Submit → wait_for verdict;
+         any step that must submit re-asserts the code first. A name given as ref ("Submit") is resolved.  FIXED+test
+M45 After switching the language, the site loaded its template asynchronously and overwrote the code (empty template
+    submitted → Runtime Error); and the problem page's own "Accepted 15.2M" statistic was read as the verdict.
+    Fix: wait for the editor to settle, insert, re-check after a pause (re-insert if replaced); wait_for{new_only}
+         counts only text that appeared after the last click (Submit).         Status: FIXED + live-probed (persists)

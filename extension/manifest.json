@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "AgentOS — let your agents use your tabs",
+  "version": "0.2.0",
+  "description": "Pairs your Chrome with your local AgentOS app so agents can list, read, screenshot and (with approval) act in your tabs.",
+  "permissions": ["tabs", "scripting", "storage", "activeTab", "alarms", "identity", "identity.email"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "AgentOS", "default_popup": "popup.html" }
+}

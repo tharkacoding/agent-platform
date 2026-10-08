@@ -1,0 +1,12 @@
+# Runner service itself
+fastapi>=0.115
+uvicorn>=0.30
+pydantic>=2.8
+# Libraries available to agent code / data analysis executed in the runner
+pandas>=2.2
+numpy>=1.26
+matplotlib>=3.8
+openpyxl>=3.1
+pytest>=8
+ruff>=0.5
+requests>=2.32

@@ -1,0 +1,20 @@
+# Example of the override file `agentos mount add` generates as docker-compose.mounts.yml.
+# Used as: docker compose -f docker-compose.yml -f docker-compose.mounts.yml up -d
+# Rules:
+#   * Every user mount goes ONLY into the runner, at /mounts/<name>.
+#   * read_only: true is the default. The CLI also lists every read-only mount in RUNNER_RO_PATHS
+#     (":"-separated), so the runner's own path jail rejects writes with a 403 before the kernel would.
+#   * The gateway never mounts user folders; it reads/writes through the runner API.
+services:
+  runner:
+    environment:
+      RUNNER_RO_PATHS: /mounts/notes
+    volumes:
+      - type: bind
+        source: C:/Users/raman/projects/myapp
+        target: /mounts/myapp
+        read_only: false
+      - type: bind
+        source: C:/Users/raman/Documents/notes
+        target: /mounts/notes
+        read_only: true
