@@ -791,7 +791,7 @@ graph TD;
 ### System/Meta
 | Agent | Graph (code) | Tools | Delegates to |
 |---|---|---|---|
-| **Self-Improvement Agent** (`self_improvement_agent`) — Studies similar products (OpenAI Dots, open-dots clones, OpenClaw, Hermes, Manus) and prop | `improve` · `aap/graphs/improve.py` | web_search, web_fetch, browser_open, browser_act, browser_snapshot, page_text, http_request, download_file | agent_builder |
+| **Self-Improvement Agent** (`self_improvement_agent`) — Studies similar products (OpenAI Dots, open-dots clones, OpenClaw, Hermes, Manus) and prop | `improve` · `aap/graphs/improve.py` | web_search, web_fetch, browser_open, browser_act, browser_snapshot, langsmith_runs, page_text, http_request, download_file | agent_builder |
 
 ## Tools every agent has
 now, calc, chrome_profiles, chrome_profile_path, find_command, known_commands, fs_find (`aap/core/sdk.py::UNIVERSAL_TOOLS`); web agents also http_request / download_file; browser agents page_text; coding-type agents skill_read (Superpowers methodology).
