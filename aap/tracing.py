@@ -25,7 +25,6 @@ def on() -> bool:
 
 def apply() -> dict:
     """Push the settings into the environment LangChain/LangGraph/LangSmith read (call at boot + on every change)."""
-    was = os.environ.get("LANGSMITH_TRACING") == "true"
     if on():
         os.environ["LANGSMITH_TRACING"] = "true"
         os.environ["LANGSMITH_API_KEY"] = settings.get("langsmith_api_key")
@@ -37,12 +36,14 @@ def apply() -> dict:
         for k in _ENV:
             os.environ.pop(k, None)
         os.environ["LANGSMITH_TRACING"] = "false"
-    if was != on():   # the cached OpenAI client was built with/without the wrapper: rebuild it
-        try:
-            from .llm import llm
-            llm.reset()
-        except Exception:  # noqa: BLE001
-            pass
+    # A wrapped OpenAI client captures the LangSmith configuration when it is created. Reset it
+    # on every tracing-settings update, including key/project rotations while tracing stays on.
+    try:
+        from .llm import llm
+        llm.reset()
+    except Exception:  # noqa: BLE001
+        pass
+    _prompt_cache.clear()  # do not retain prompts fetched under the previous key/project/settings
     return status()
 
 
@@ -142,9 +143,12 @@ def push_prompts() -> dict:
         return {"ok": False, "error": "turn tracing on and add the API key first"}
     from langchain_core.messages import SystemMessage
     from langchain_core.prompts import ChatPromptTemplate
+    from . import registry
     from .agents.prebuilt.catalog import PREBUILT
+    # The registry contains the seeded agents plus custom/imported agents created at runtime.
+    agents = registry.list_agents(include_inactive=True) or PREBUILT
     cli, pushed, failed = _client(), [], []
-    for a in PREBUILT:
+    for a in agents:
         text = a.system_prompt or f"You are the {a.name}. {a.description}"
         try:   # message objects, not a template: braces in prompts are not variables
             cli.push_prompt(hub_name(a.id), object=ChatPromptTemplate.from_messages([SystemMessage(content=text)]),

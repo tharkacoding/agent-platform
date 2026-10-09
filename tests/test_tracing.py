@@ -51,6 +51,17 @@ def test_enabled_needs_key_and_sets_env_and_names_runs():
     assert tracing.apply()["active"] is False and "LANGSMITH_API_KEY" not in os.environ
 
 
+def test_settings_changes_refresh_cached_client_while_tracing_stays_enabled(monkeypatch):
+    from aap.llm import llm
+    resets = []
+    monkeypatch.setattr(llm, "reset", lambda: resets.append(True))
+    settings.update({"langsmith_enabled": True, "langsmith_api_key": "lsv2_first_test_key"})
+    settings.update({"langsmith_api_key": "lsv2_rotated_test_key", "langsmith_project": "agentos-rotated"})
+    assert len(resets) == 2  # changing credentials/project must rebuild a client even if tracing remains on
+    assert os.environ["LANGSMITH_PROJECT"] == "agentos-rotated"
+    settings.update({"langsmith_enabled": False, "langsmith_api_key": ""})
+
+
 def test_api_key_is_a_masked_secret():
     settings.update({"langsmith_api_key": "lsv2_secret_value_123"})
     shown = settings.all_settings()["langsmith_api_key"]
@@ -109,6 +120,11 @@ def test_push_prompts_uses_message_objects(monkeypatch):
     settings.update({"langsmith_enabled": True, "langsmith_api_key": "lsv2_x"})
     tracing.apply()
     pushed = {}
+    from aap import registry
+    from aap.agents.prebuilt.catalog import PREBUILT
+    from aap.models import AgentSpec
+    custom = AgentSpec(id="custom_echo", name="Custom Echo", type="custom", system_prompt="A custom agent prompt")
+    monkeypatch.setattr(registry, "list_agents", lambda include_inactive=True: [*PREBUILT, custom])
 
     class Cli:
         def push_prompt(self, name, object=None, description="", is_public=False):
@@ -116,5 +132,6 @@ def test_push_prompts_uses_message_objects(monkeypatch):
     monkeypatch.setattr(tracing, "_client", lambda: Cli())
     r = tracing.push_prompts()
     assert r["ok"] and r["pushed"] >= 30 and "agentos-main-agent" in pushed and pushed["agentos-main-agent"][1] is False
+    assert pushed["agentos-custom-echo"] == ("A custom agent prompt", False)
     settings.update({"langsmith_enabled": False, "langsmith_api_key": ""})
     tracing.apply()
